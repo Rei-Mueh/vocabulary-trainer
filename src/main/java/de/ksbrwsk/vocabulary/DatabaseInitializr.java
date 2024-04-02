@@ -2,6 +2,7 @@ package de.ksbrwsk.vocabulary;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
+import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -9,6 +10,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.StreamUtils;
 
 import java.io.IOException;
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 
@@ -30,13 +33,16 @@ public class DatabaseInitializr {
     private void processData() throws IOException {
         String dataFileUrl = applicationProperties.getDataFileUrl();
         log.info("Vokabeln einlesen und Datenbank initialisieren. Quelle: {}", dataFileUrl);
-        Resource resource = new UrlResource(dataFileUrl);
-        String str = StreamUtils.copyToString(resource.getInputStream(), StandardCharsets.ISO_8859_1);
+        Resource resource = readeDataFile(dataFileUrl);
+        //Resource resource = new UrlResource(dataFileUrl);
+        //Resource resource = new FileSystemResource(dataFileUrl);
+        String str = StreamUtils.copyToString(resource.getInputStream(), StandardCharsets.UTF_8);
         String[] tmp = str.split("\n");
         List<String> strings = List.of(tmp);
         List<VocabularyTupel> vcs = strings
                 .stream()
                 .skip(1) // headers
+                .map(String::trim)
                 .map(this::splitVcTuple)
                 .map(this::createTupel).toList();
         this.vocabularyRepository.reset();
@@ -54,4 +60,15 @@ public class DatabaseInitializr {
         s = s.replaceAll("(\r\n|\r)", "");
         return s.split(";");
     }
+
+    private Resource readeDataFile(String dataFileUrl) throws MalformedURLException {
+        Resource resource;
+        if (dataFileUrl.startsWith("http://") || dataFileUrl.startsWith("https://")) {
+            resource = new UrlResource(new URL(dataFileUrl));
+        } else {
+            resource = new FileSystemResource(dataFileUrl);
+        }
+        return resource;
+    }
+
 }
